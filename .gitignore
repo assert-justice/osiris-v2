@@ -1,3 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
+.vscode/
 /android/
+assets/artifacts/
+bin/
+__pycache__/
