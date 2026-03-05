@@ -49,4 +49,14 @@ public class DeSize : RojaDict, IRojaSerializerJson<DeSize>
         var height = DeLength.FromJson(jsonObject["height"]);
         return new(width, height);
     }
+    public DeMath.Vec2 GetSizePx()
+    {
+        float w = DeLength.GetLengthPx(Width);
+        float h = DeLength.GetLengthPx(Height);
+        return new(w,h);
+    }
+    public static DeMath.Vec2 GetSizePx(DeSize? size)
+    {
+        return size?.GetSizePx() ?? new();
+    }
 }

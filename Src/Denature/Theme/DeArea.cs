@@ -79,4 +79,16 @@ public class DeArea : RojaDict, IRojaSerializerJson<DeArea>
         obj["left"] = Left?.ToJson();
         return obj;
     }
+    public (float,float,float,float) GetAreaPx()
+    {
+        float top = DeLength.GetLengthPx(Top);
+        float bottom = DeLength.GetLengthPx(Bottom);
+        float left = DeLength.GetLengthPx(Left);
+        float right = DeLength.GetLengthPx(Right);
+        return (top, bottom, left, right);
+    }
+    public static (float,float,float,float) GetAreaPx(DeArea? area)
+    {
+        return area?.GetAreaPx() ?? (0,0,0,0);
+    }
 }

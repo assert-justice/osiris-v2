@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Osiris.Src.Denature.Node;
 
 namespace Osiris.Src.Denature;
 
@@ -11,9 +12,10 @@ public class DeDom
     private readonly HashSet<DeNode> FreedNodeIds = [];
     private readonly List<DeNode> DirtyNodes = [];
     private bool IsRendering_ = false;
-    public DeDom(Func<DeDom, DeNode> rootFn)
+    public DeDom(DeNode root)
     {
-        Root = rootFn(this);
+        Root = root;
+        Root.InitRoot(this);
         MarkDirty(Root);
         Update();
     }

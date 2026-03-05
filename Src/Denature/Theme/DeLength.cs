@@ -70,4 +70,10 @@ public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeL
     {
         return $"{Value} {Kind}";
     }
+    public static float GetLengthPx(DeLength? length)
+    {
+        if(length == null) return 0;
+        else if(length.Kind == DeKind.Px) return length.Value;
+        else return 0;
+    }
 }

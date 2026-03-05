@@ -6,25 +6,26 @@ namespace Osiris.Src.Denature.Theme;
 
 public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
 {
-    public enum DeFlowDirection
+    public enum DeFlow
     {
         None,
         Column,
         Row,
+        Grid,
     }
     public enum DeJustify
     {
-        Stretch,
         Start,
         Center,
         End,
+        Stretch,
     }
     public DeArea? Margins{get; private set;}
     public DeArea? Padding{get; private set;}
     public DeSize? Size{get; private set;}
     public DeSize? MinSize{get; private set;}
     public DeSize? MaxSize{get; private set;}
-    public DeFlowDirection? FlowDirection{get; private set;}
+    public DeFlow? Flow{get; private set;}
     public int? Wrap{get; private set;}
     public DeJustify? Justify{get; private set;}
     public DeTheme(){}
@@ -34,7 +35,7 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
         DeSize? size = null, 
         DeSize? minSize = null,
         DeSize? maxSize = null,
-        DeFlowDirection? flowDirection = null,
+        DeFlow? flowDirection = null,
         int? wrap = null,
         DeJustify? justify = null)
     {
@@ -43,7 +44,7 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
         Size = size;
         MinSize = minSize;
         MaxSize = maxSize;
-        FlowDirection = flowDirection;
+        Flow = flowDirection;
         Wrap = wrap;
         Justify = justify;
     }
@@ -56,7 +57,7 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
             "size" => Size?.ToJson(),
             "min_size" => MinSize?.ToJson(),
             "max_size" => MaxSize?.ToJson(),
-            "flow_direction" => FlowDirection?.ToString(),
+            "flow" => Flow?.ToString(),
             "wrap" => Wrap,
             "justify" => Justify?.ToString(),
             _ => null,
@@ -81,9 +82,9 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
             case "max_size":
                 MaxSize = DeSize.FromJson(jsonNode);
                 return true;
-            case "flow_direction":
-                if(!RojaUtils.TryAsEnum<DeFlowDirection>(jsonNode, out var flow)) return false;
-                FlowDirection = flow;
+            case "flow":
+                if(!RojaUtils.TryAsEnum<DeFlow>(jsonNode, out var flow)) return false;
+                Flow = flow;
                 return true;
             case "wrap":
                 if(!RojaUtils.TryAsNumber(jsonNode, out int wrap)) return false;
@@ -105,7 +106,7 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
         var size = DeSize.FromJson(jsonObject["size"]);
         var minSize = DeSize.FromJson(jsonObject["min_size"]);
         var maxSize = DeSize.FromJson(jsonObject["max_size"]);
-        DeFlowDirection? flowDirection = RojaUtils.TryAsEnum<DeFlowDirection>(jsonObject["flow_direction"], out var flowDir) ? flowDir : null;
+        DeFlow? flowDirection = RojaUtils.TryAsEnum<DeFlow>(jsonObject["flow"], out var flowDir) ? flowDir : null;
         int? wrap = RojaUtils.TryAsNumber(jsonObject["wrap"], out int w) ? w : null;
         DeJustify? justify = RojaUtils.TryAsEnum<DeJustify>(jsonObject["justify"], out var j) ? j : null;
         return new(margins, padding, size, minSize, maxSize, flowDirection, wrap, justify);
@@ -118,7 +119,7 @@ public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
         obj["size"] = Size?.ToJson();
         obj["min_size"] = MinSize?.ToJson();
         obj["max_size"] = MaxSize?.ToJson();
-        obj["flow_direction"] = FlowDirection?.ToString();
+        obj["flow"] = Flow?.ToString();
         obj["wrap"] = Wrap?.ToString();
         obj["justify"] = Justify?.ToString();
         return obj;
