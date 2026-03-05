@@ -25,6 +25,7 @@ public abstract class DeNode
     private readonly List<DeNode> Children = [];
     private readonly Dictionary<string, DeNode> FreedChildren = [];
     private JsonObject Props = [];
+    public DeTransform Transform{get; private set;} = new();
     public DeNode(string id, JsonObject props, string tag = "div")
     {
         Id = id;
@@ -41,6 +42,45 @@ public abstract class DeNode
         if(parent.Dom is not null) SetDom(parent.Dom);
     }
     private void SetProps(JsonObject props){Props = props;}
+    private void UpdateTransform()
+    {
+        // When a node is rendered its transform needs to be updated.
+        // This proceeds from the top of the tree to the bottom
+        // Typically the parent should know what its maximum size is
+        // The children should know what their minimum size is
+        // The default behavior should be to minimize the size of nodes
+        // First let's calculate our minimum size. That just comes from our style
+        // Unless its a percent or a flex or something. Then it defaults to zero
+        // Todo: add variables to style
+
+        var themeMinWidth = Theme?.MinSize?.Width;
+        float minWidth = 0;
+        if(themeMinWidth is not null)
+        {
+            minWidth = themeMinWidth.Kind switch
+            {
+                DeLength.DeKind.Px => themeMinWidth.Value,
+                // handle relative later
+                _ => 0,
+            };
+        }
+        var themeMinHeight = Theme?.MaxSize?.Height;
+        float minHeight = 0;
+        if(themeMinHeight is not null)
+        {
+            minHeight = themeMinHeight.Kind switch
+            {
+                DeLength.DeKind.Px => themeMinHeight.Value,
+                // handle relative later
+                _ => 0,
+            };
+        }
+        Transform = new()
+        {
+            MinWidth = minWidth,
+            MinHeight = minHeight,
+        };
+    }
     protected void SetThemeSheet(DeThemeSheet themeSheet)
     {
         ThemeSheet = themeSheet;

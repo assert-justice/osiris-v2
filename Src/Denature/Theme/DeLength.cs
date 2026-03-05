@@ -9,9 +9,23 @@ public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeL
 {
     public enum DeKind
     {
+        // Absolute length in pixels
         Px,
         Percent,
+        Cap,
+        Ch,
         Em,
+        Ex,
+        Lh,
+        Rcap,
+        Rch,
+        Rem,
+        Rex,
+        Rlh,
+        Vh,
+        Vw,
+        Vmax,
+        Vmin,
         Flex,
     }
     public readonly float Value = 0;
@@ -26,6 +40,7 @@ public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeL
         if(!RojaUtils.TryAsObject(jsonNode, out var jsonObject)) return null;
         if(!RojaUtils.TryAsNumber(jsonObject["width"], out float value)) return null;
         if(!RojaUtils.TryAsString(jsonObject["kind"], out string kindStr)) return null;
+        if(kindStr.Trim() == "%") kindStr = "Percent";
         if(!Enum.TryParse<DeKind>(kindStr, true, out var kind)) return null;
         return new(value, kind);
     }
@@ -33,8 +48,10 @@ public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeL
     {
         JsonObject obj = [];
         obj["value"] = Value;
-        obj["kind"] = Kind.ToString();
-        throw new NotImplementedException();
+        var kind = Kind.ToString();
+        if(kind == "Percent") kind = "%";
+        obj["kind"] = kind;
+        return obj;
     }
     public static bool TryFromString(string serialized, out DeLength res)
     {
@@ -43,7 +60,9 @@ public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeL
         var args = serialized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if(args.Length != 2) return false;
         if(!float.TryParse(args[0], out float value)) return false;
-        if(!Enum.TryParse<DeKind>(args[1], true, out var kind)) return false;
+        string kindStr = args[1];
+        if(kindStr == "%") kindStr = "Percent";
+        if(!Enum.TryParse<DeKind>(kindStr, true, out var kind)) return false;
         res = new(value, kind);
         return true;
     }

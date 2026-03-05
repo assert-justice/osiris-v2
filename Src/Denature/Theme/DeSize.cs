@@ -19,7 +19,7 @@ public class DeSize : RojaDict, IRojaSerializerJson<DeSize>
             _ => null,
         };
     }
-    public override bool TrySetFieldInternal(string fieldName, JsonNode? jsonNode)
+    protected override bool TrySetFieldInternal(string fieldName, JsonNode? jsonNode)
     {
         switch (fieldName)
         {
