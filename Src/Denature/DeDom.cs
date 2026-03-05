@@ -9,7 +9,6 @@ public class DeDom
     private readonly Dictionary<string, (Func<string>,HashSet<DeNode>)> Callbacks = [];
     private readonly HashSet<string> DirtyNodeIds = [];
     private readonly HashSet<DeNode> FreedNodeIds = [];
-    private readonly Dictionary<string,DeNode> PersistentNodes = [];
     private readonly List<DeNode> DirtyNodes = [];
     private bool IsRendering_ = false;
     public DeDom(Func<DeDom, DeNode> rootFn)
@@ -51,11 +50,7 @@ public class DeDom
     }
     public void MarkFreed(DeNode node)
     {
-        if(!PersistentNodes.ContainsKey(node.Path)) FreedNodeIds.Add(node);
-    }
-    public void MarkPersistent(DeNode node)
-    {
-        PersistentNodes.Add(node.Path, node);
+        FreedNodeIds.Add(node);
     }
     public void Update()
     {
@@ -70,11 +65,11 @@ public class DeDom
             if(!FreedNodeIds.Contains(node)) continue;
             // Call render on the node. This will recursively call render on its children and clean itself.
             // Todo: nodes cannot set state while rendering. Callbacks are deferred. Not 100% foolproof
-            // Todo: figure out what the deal with props is
-            node.Render([]);
+            node.RenderInternal();
         }
         // Should let them be reclaimed by the gc. Unless I have a memory leak...
         FreedNodeIds.Clear();
         IsRendering_ = false;
     }
+    public DeEnv GetEnv(){return new(640, 480);}
 }

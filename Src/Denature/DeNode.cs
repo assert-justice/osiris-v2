@@ -3,52 +3,45 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Nodes;
 using Osiris.Src.Denature.Theme;
+using Osiris.Src.Roja;
 
 namespace Osiris.Src.Denature;
 
 public abstract class DeNode
 {
     public readonly string Id;
-    // public readonly bool Persistent;
-    private readonly DeDom? Dom;
-    private readonly string Tag;
+    public readonly string Tag;
     public string Path{get; private set;}
+    public readonly int Depth = 1;
+    private DeDom? Dom;
     private DeNode? Parent;
-    private JsonObject State = [];
+    private bool ThemeRecalculationQueued = true;
     private HashSet<string> Clades = [];
+    private DeThemeSheet? ThemeSheet;
+    // private DeTheme BaseTheme = new();
+    private DeThemeDirtyFlag ParentTheme = new(new());
+    protected DeThemeDirtyFlag ThemeOverrides = new();
+    private DeTheme Theme = new();
+    private JsonObject State = [];
     private readonly List<DeNode> Children = [];
     private readonly Dictionary<string, DeNode> FreedChildren = [];
     private JsonObject Props = [];
-    // Todo: make setting the theme dirty the node
-    protected DeTheme Theme = new();
-    public readonly int Depth = 1;
-    // Todo: figure out how to make node initialization less annoying. Set parent/dom via
-    public DeNode(string id, JsonObject props, DeTheme? theme = null, string tag = "div", HashSet<string>? clades = null/*, bool persistent = false*/)
+    public DeNode(string id, JsonObject props, string tag = "div")
     {
         Id = id;
         Props = props;
-        Theme = theme ?? new();
         Tag = tag;
-        Clades = clades ?? [];
-        // Todo: reconsider the whole persistent thing. Is it premature optimization?
-        // Persistent = persistent;
-        // if(persistent) Dom.MarkPersistent(this);
         Path = Id;;
     }
-    // public DeNode(string id, JsonObject props, DeTheme? theme = null, bool persistent = false) 
-    //     : this(id, props, theme, persistent)
-    // {
-    //     // Note: adding the child to the parent's list of children is the parent's responsibility
-    //     Parent = parent;
-    //     Path = parent.Path + Path;
-    //     Depth = parent.Depth + 1;
-    // }
-    private void SetDom(){}
+    private void SetDom(DeDom dom){Dom = dom;}
     private void SetParent(DeNode parent)
     {
         Parent = parent;
         Path = parent.Path + Path;
+        ParentTheme = new(parent.Theme);
+        if(parent.Dom is not null) SetDom(parent.Dom);
     }
+    private void SetProps(JsonObject props){Props = props;}
     private void OnMountInternal()
     {
         foreach (var child in Children)
@@ -67,7 +60,7 @@ public abstract class DeNode
     }
     protected virtual void OnMount(){}
     protected virtual void OnUnmount(){}
-    public void RenderInternal(JsonObject props)
+    public void RenderInternal()
     {
         if(Dom is null) throw new Exception("No dom set");
         foreach (var child in Children)
@@ -75,21 +68,22 @@ public abstract class DeNode
             FreedChildren.Add(child.Id, child);
         }
         Children.Clear();
-        foreach (var child in Render(props))
+        foreach (var child in Render(Props))
         {
             if(FreedChildren.TryGetValue(child.Id, out var oldChild) && child.GetType() == oldChild.GetType())
             {
                 FreedChildren.Remove(child.Id);
                 oldChild.SetProps(child.Props);
                 Children.Add(oldChild);
+                oldChild.Render(oldChild.Props);
             }
             else
             {
                 child.OnMountInternal();
+                child.SetParent(this);
                 Children.Add(child);
+                child.Render(child.Props);
             }
-            // Todo: handle props!
-            child.Render([]);
         }
         // Properly free the excess children
         foreach (var freedChild in FreedChildren.Values)
@@ -100,5 +94,42 @@ public abstract class DeNode
         Dom.MarkClean(this);
     }
     public virtual IEnumerable<DeNode> Render(JsonObject props){yield break;}
-    public void SetProps(JsonObject props){Props = props;}
+    public DeNode? GetParent(){return Parent;}
+    public JsonObject GetState(){return State;}
+    public void SetState(JsonObject state)
+    {
+        State = state;
+        Dom?.MarkDirty(this);
+    }
+    // get theme
+    public DeTheme GetTheme()
+    {
+        // Check if we need to recalculate
+        // bool themeIsDirty = ThemeRecalculationQueued || ParentTheme.IsDirty();
+        bool themeIsDirty = ParentTheme.IsDirty() || ThemeOverrides.IsDirty();
+        if(ParentTheme.IsDirty()){Theme = RojaDict.DeepCopy(ParentTheme.GetTheme());}
+        if (ThemeRecalculationQueued)
+        {
+            Stack<DeThemeSheet> themeSheets = new();
+            DeNode? node = this;
+            while(node is not null)
+            {
+                if(node.ThemeSheet is not null) themeSheets.Push(node.ThemeSheet);
+                node = node.Parent;
+            }
+            if(Dom is null) throw new Exception("No dom set");
+            while(themeSheets.TryPop(out var sheet))
+            {
+                if(!sheet.TryMergeThemes(ref Theme, this, Dom.GetEnv())) throw new Exception("Failed to merge theme sheets");
+            }
+        }
+        if (themeIsDirty)
+        {
+            // recalculate just our theme
+            if(!RojaDict.TryMerge(ref Theme, ThemeOverrides.GetTheme())) throw new Exception("Failed to merge theme overrides");
+        }
+        return Theme;
+    }
+    // set theme, update theme delta
+    // set theme sheet
 }

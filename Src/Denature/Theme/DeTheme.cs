@@ -1,19 +1,17 @@
 using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
+using Osiris.Src.Roja;
 
 namespace Osiris.Src.Denature.Theme;
 
-public class DeTheme
+public class DeTheme : RojaDict, IRojaSerializerJson<DeTheme>
 {
-    [JsonConverter(typeof(JsonStringEnumConverter<DeFlowDirection>))]
     public enum DeFlowDirection
     {
         None,
         Column,
         Row,
     }
-    [JsonConverter(typeof(JsonStringEnumConverter<DeJustify>))]
     public enum DeJustify
     {
         Stretch,
@@ -21,45 +19,108 @@ public class DeTheme
         Center,
         End,
     }
-    public DeArea Margins = new();
-    public DeArea Padding = new();
-    public DeSize Size = new();
-    public DeSize MinSize = new();
-    public DeSize MaxSize = new()
-    {
-        Width=new(float.PositiveInfinity, DeLength.DeKind.Px),
-        Height=new(float.PositiveInfinity, DeLength.DeKind.Px),
-    };
-    public DeFlowDirection FlowDirection = DeFlowDirection.None;
-    public int Wrap = 0;
-    public DeJustify Justify = DeJustify.Stretch;
+    public DeArea? Margins{get; private set;}
+    public DeArea? Padding{get; private set;}
+    public DeSize? Size{get; private set;}
+    public DeSize? MinSize{get; private set;}
+    public DeSize? MaxSize{get; private set;}
+    public DeFlowDirection? FlowDirection{get; private set;}
+    public int? Wrap{get; private set;}
+    public DeJustify? Justify{get; private set;}
     public DeTheme(){}
-    public DeTheme(DeNode node, DeEnv env, DeThemeSheet themeSheet)
+    public DeTheme(
+        DeArea? margins = null, 
+        DeArea? padding = null, 
+        DeSize? size = null, 
+        DeSize? minSize = null,
+        DeSize? maxSize = null,
+        DeFlowDirection? flowDirection = null,
+        int? wrap = null,
+        DeJustify? justify = null)
     {
-        // Todo: finish implementing this
-        foreach (var (name, value) in themeSheet.GetThemeFields(node, env))
+        Margins = margins;
+        Padding = padding;
+        Size = size;
+        MinSize = minSize;
+        MaxSize = maxSize;
+        FlowDirection = flowDirection;
+        Wrap = wrap;
+        Justify = justify;
+    }
+    public override JsonNode? GetField(string fieldName)
+    {
+        return fieldName switch
         {
-            switch (name)
-            {
-                case "Margins":
-                break;
-                case "Padding":
-                break;
-                case "Size":
-                break;
-                case "MinSize":
-                break;
-                case "MaxSize":
-                break;
-                case "FlowDirection":
-                break;
-                case "Wrap":
-                break;
-                case "Justify":
-                break;
-                default:
-                throw new Exception($"Unexpected style field name '{name}'");
-            }
+            "margins" => Margins?.ToJson(),
+            "padding" => Padding?.ToJson(),
+            "size" => Size?.ToJson(),
+            "min_size" => MinSize?.ToJson(),
+            "max_size" => MaxSize?.ToJson(),
+            "flow_direction" => FlowDirection?.ToString(),
+            "wrap" => Wrap,
+            "justify" => Justify?.ToString(),
+            _ => null,
+        };
+    }
+    protected override bool TrySetFieldInternal(string fieldName, JsonNode? jsonNode)
+    {
+        switch (fieldName)
+        {
+            case "margins":
+                Margins = DeArea.FromJson(jsonNode);
+                return true;
+            case "padding":
+                Padding = DeArea.FromJson(jsonNode);
+                return true;
+            case "size":
+                Size = DeSize.FromJson(jsonNode);
+                return true;
+            case "min_size":
+                MinSize = DeSize.FromJson(jsonNode);
+                return true;
+            case "max_size":
+                MaxSize = DeSize.FromJson(jsonNode);
+                return true;
+            case "flow_direction":
+                if(!RojaUtils.TryAsEnum<DeFlowDirection>(jsonNode, out var flow)) return false;
+                FlowDirection = flow;
+                return true;
+            case "wrap":
+                if(!RojaUtils.TryAsNumber(jsonNode, out int wrap)) return false;
+                Wrap = wrap;
+                return true;
+            case "justify":
+                if(!RojaUtils.TryAsEnum<DeJustify>(jsonNode, out var justify)) return false;
+                Justify = justify;
+                return true;
+            default:
+                return false;
         }
+    }
+    public static DeTheme? FromJson(JsonNode? jsonNode)
+    {
+        if(!RojaUtils.TryAsObject(jsonNode, out var jsonObject)) return null;
+        var margins = DeArea.FromJson(jsonObject["margins"]);
+        var padding = DeArea.FromJson(jsonObject["padding"]);
+        var size = DeSize.FromJson(jsonObject["size"]);
+        var minSize = DeSize.FromJson(jsonObject["min_size"]);
+        var maxSize = DeSize.FromJson(jsonObject["max_size"]);
+        DeFlowDirection? flowDirection = RojaUtils.TryAsEnum<DeFlowDirection>(jsonObject["flow_direction"], out var flowDir) ? flowDir : null;
+        int? wrap = RojaUtils.TryAsNumber(jsonObject["wrap"], out int w) ? w : null;
+        DeJustify? justify = RojaUtils.TryAsEnum<DeJustify>(jsonObject["justify"], out var j) ? j : null;
+        return new(margins, padding, size, minSize, maxSize, flowDirection, wrap, justify);
+    }
+    public JsonNode ToJson()
+    {
+        JsonObject obj = [];
+        obj["margins"] = Margins?.ToJson();
+        obj["padding"] = Padding?.ToJson();
+        obj["size"] = Size?.ToJson();
+        obj["min_size"] = MinSize?.ToJson();
+        obj["max_size"] = MaxSize?.ToJson();
+        obj["flow_direction"] = FlowDirection?.ToString();
+        obj["wrap"] = Wrap?.ToString();
+        obj["justify"] = Justify?.ToString();
+        return obj;
     }
 }

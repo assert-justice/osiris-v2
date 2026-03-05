@@ -1,12 +1,12 @@
 using System;
-using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using Godot;
+using Osiris.Src.Roja;
 
 namespace Osiris.Src.Denature.Theme;
 
-public readonly struct DeLength
+public class DeLength : IRojaSerializerJson<DeLength>, IRojaSerializerString<DeLength>
 {
-    [JsonConverter(typeof(JsonStringEnumConverter<DeKind>))]
     public enum DeKind
     {
         Px,
@@ -16,34 +16,39 @@ public readonly struct DeLength
     }
     public readonly float Value = 0;
     public readonly DeKind Kind = DeKind.Px;
-    public DeLength(){}
     public DeLength(float value, DeKind kind)
     {
         Value = value;
         Kind = kind;
     }
-    public static bool TryParse(string lengthStr, out DeLength length)
+    public static DeLength? FromJson(JsonNode? jsonNode)
     {
-        length = default;
-        if(lengthStr == "auto")
-        {
-            length = new();
-            return true;
-        }
-        int sepIdx = lengthStr.Find(' ');
-        if(sepIdx == -1) return false;
-        char[] chars = lengthStr.ToCharArray();
-        ReadOnlySpan<char> valueSpan = chars.AsSpan(0, sepIdx);
-        if(!float.TryParse(valueSpan, out float value)) return false;
-        for (int idx = sepIdx; idx < chars.Length; idx++)
-        {
-            char c = chars[idx];
-            if(c == ' ') continue;
-            if(char.IsAsciiLetterLower(c)) chars[idx] = char.ToUpper(c);
-            if(!Enum.TryParse<DeKind>(chars.AsSpan(idx), out var kind)) return false;
-            length = new(value, kind);
-            return true;
-        }
-        return false;
+        if(!RojaUtils.TryAsObject(jsonNode, out var jsonObject)) return null;
+        if(!RojaUtils.TryAsNumber(jsonObject["width"], out float value)) return null;
+        if(!RojaUtils.TryAsString(jsonObject["kind"], out string kindStr)) return null;
+        if(!Enum.TryParse<DeKind>(kindStr, true, out var kind)) return null;
+        return new(value, kind);
+    }
+    public JsonNode ToJson()
+    {
+        JsonObject obj = [];
+        obj["value"] = Value;
+        obj["kind"] = Kind.ToString();
+        throw new NotImplementedException();
+    }
+    public static bool TryFromString(string serialized, out DeLength res)
+    {
+        res = default!;
+        // Todo: optimize this with spans
+        var args = serialized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if(args.Length != 2) return false;
+        if(!float.TryParse(args[0], out float value)) return false;
+        if(!Enum.TryParse<DeKind>(args[1], true, out var kind)) return false;
+        res = new(value, kind);
+        return true;
+    }
+    public new string ToString()
+    {
+        return $"{Value} {Kind}";
     }
 }
