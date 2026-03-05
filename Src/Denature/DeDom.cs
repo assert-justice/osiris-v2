@@ -8,8 +8,8 @@ public class DeDom
 {
     private readonly DeNode Root;
     private readonly Dictionary<string, (Func<string>,HashSet<DeNode>)> Callbacks = [];
-    private readonly HashSet<string> DirtyNodeIds = [];
-    private readonly HashSet<DeNode> FreedNodeIds = [];
+    private readonly HashSet<Guid> DirtyNodeIds = [];
+    private readonly HashSet<DeNode> FreedNodes = [];
     private readonly List<DeNode> DirtyNodes = [];
     private bool IsRendering_ = false;
     public DeDom(DeNode root)
@@ -42,17 +42,17 @@ public class DeDom
     }
     public void MarkDirty(DeNode node)
     {
-        if(DirtyNodeIds.Contains(node.Id)) return;
+        if(DirtyNodeIds.Contains(node.Uuid)) return;
         DirtyNodes.Add(node);
-        DirtyNodeIds.Add(node.Id);
+        DirtyNodeIds.Add(node.Uuid);
     }
     public void MarkClean(DeNode node)
     {
-        DirtyNodeIds.Remove(node.Id);
+        DirtyNodeIds.Remove(node.Uuid);
     }
     public void MarkFreed(DeNode node)
     {
-        FreedNodeIds.Add(node);
+        FreedNodes.Add(node);
     }
     public void Update()
     {
@@ -63,14 +63,16 @@ public class DeDom
         // For each dirty node, check if it is still in the dirty ids set
         foreach (var node in DirtyNodes)
         {
-            if(!DirtyNodeIds.Contains(node.Id)) continue;
-            if(!FreedNodeIds.Contains(node)) continue;
+            if(!DirtyNodeIds.Contains(node.Uuid)) continue;
+            if(FreedNodes.Contains(node)) continue;
             // Call render on the node. This will recursively call render on its children and clean itself.
             // Todo: nodes cannot set state while rendering. Callbacks are deferred. Not 100% foolproof
             node.RenderInternal();
         }
+        DirtyNodes.Clear();
+        DirtyNodeIds.Clear();
         // Should let them be reclaimed by the gc. Unless I have a memory leak...
-        FreedNodeIds.Clear();
+        FreedNodes.Clear();
         IsRendering_ = false;
     }
     public DeEnv GetEnv(){return new(640, 480);}

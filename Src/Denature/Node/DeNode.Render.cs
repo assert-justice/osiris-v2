@@ -7,6 +7,7 @@ namespace Osiris.Src.Denature.Node;
 public abstract partial class DeNode
 {
     private readonly Dictionary<string, DeNode> FreedChildren = [];
+    private bool IsFirstRender = true;
     private void OnMountInternal()
     {
         foreach (var child in Children)
@@ -28,6 +29,11 @@ public abstract partial class DeNode
     public void RenderInternal()
     {
         if(Dom is null) throw new Exception("No dom set");
+        if(IsFirstRender)
+        {
+            OnMountInternal();
+            IsFirstRender = false;
+        }
         foreach (var child in Children)
         {
             FreedChildren.Add(child.Id, child);
@@ -40,23 +46,24 @@ public abstract partial class DeNode
                 FreedChildren.Remove(child.Id);
                 oldChild.SetProps(child.Props);
                 Children.Add(oldChild);
-                oldChild.Render(oldChild.Props);
             }
             else
             {
                 child.SetParent(this);
-                child.OnMountInternal();
                 Children.Add(child);
-                child.Render(child.Props);
             }
         }
-        UpdateTransform();
-        // Properly free the excess children
+        // Free the excess children
         foreach (var freedChild in FreedChildren.Values)
         {
             freedChild.OnUnmountInternal();
             Dom.MarkFreed(freedChild);
         }
+        foreach (var child in Children)
+        {
+            child.RenderInternal();
+        }
+        UpdateTransform();
         Dom.MarkClean(this);
     }
     protected virtual IEnumerable<DeNode> Render(JsonObject props){yield break;}

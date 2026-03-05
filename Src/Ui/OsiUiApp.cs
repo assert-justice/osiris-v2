@@ -22,5 +22,6 @@ public class OsiUiApp : OsiUiNode
     {
         base.OnMount();
         GD.Print(AppControl.GetParent());
+        AppControl.Size = new(1000, 1000);
     }
 }
