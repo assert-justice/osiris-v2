@@ -18,7 +18,6 @@ public abstract class DeNode
     private bool ThemeRecalculationQueued = true;
     private HashSet<string> Clades = [];
     private DeThemeSheet? ThemeSheet;
-    // private DeTheme BaseTheme = new();
     private DeThemeDirtyFlag ParentTheme = new(new());
     protected DeThemeDirtyFlag ThemeOverrides = new();
     private DeTheme Theme = new();
@@ -42,6 +41,23 @@ public abstract class DeNode
         if(parent.Dom is not null) SetDom(parent.Dom);
     }
     private void SetProps(JsonObject props){Props = props;}
+    protected void SetThemeSheet(DeThemeSheet themeSheet)
+    {
+        ThemeSheet = themeSheet;
+        ThemeRecalculationQueued = true;
+    }
+    protected void AddClade(string cladeName)
+    {
+        if(Clades.Contains(cladeName)) return;
+        Clades.Add(cladeName);
+        ThemeRecalculationQueued = true;
+    }
+    protected bool RemoveClade(string cladeName)
+    {
+        if(!Clades.Remove(cladeName)) return false;
+        ThemeRecalculationQueued = true;
+        return true;
+    }
     private void OnMountInternal()
     {
         foreach (var child in Children)
@@ -104,12 +120,11 @@ public abstract class DeNode
     // get theme
     public DeTheme GetTheme()
     {
-        // Check if we need to recalculate
-        // bool themeIsDirty = ThemeRecalculationQueued || ParentTheme.IsDirty();
         bool themeIsDirty = ParentTheme.IsDirty() || ThemeOverrides.IsDirty();
         if(ParentTheme.IsDirty()){Theme = RojaDict.DeepCopy(ParentTheme.GetTheme());}
         if (ThemeRecalculationQueued)
         {
+            ThemeRecalculationQueued = false;
             Stack<DeThemeSheet> themeSheets = new();
             DeNode? node = this;
             while(node is not null)
@@ -130,6 +145,15 @@ public abstract class DeNode
         }
         return Theme;
     }
-    // set theme, update theme delta
-    // set theme sheet
+    public bool HasClade(string cladeName)
+    {
+        return Clades.Contains(cladeName);
+    }
+    public IEnumerable<string> GetClades()
+    {
+        foreach (var clade in Clades)
+        {
+            yield return clade;
+        }
+    }
 }
