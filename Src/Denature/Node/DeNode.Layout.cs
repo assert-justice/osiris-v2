@@ -14,9 +14,17 @@ public abstract partial class DeNode
         /* Layout
         Each node knows what its parent's max size is
         In fact the parent probably tells the child how big its allowed to be
+        Nodes have constraints. The parent sets the max size constraint. Then the child sets the min size constraint.
+        Note that minimizing the width might increase the max and vice versa
         Earlier nodes in the hierarchy get priority
+        The child prioritizes keeping the width under the max width constraint. 
+        If the hight has to be different that gets reflected in the constraints
         If there simply isn't enough room it may be possible to scroll down
-        Avoid scrolling horizontally at all costs
+        Avoid scrolling horizontally
+
+        Tl;dr you go down the tree setting max size constraints
+        You go up the tree setting min size constraints
+        Then down the tree one more time actually setting the transforms
         */
         if(Dom is null) return;
         var env = Dom.GetEnv();
