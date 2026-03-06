@@ -5,5 +5,5 @@ namespace Osiris.Src.Roja;
 public interface IRojaSerializerJson<T>
 {
     public static abstract T? FromJson(JsonNode? jsonNode);
-    public abstract JsonNode ToJson();
+    public abstract JsonNode? ToJson();
 }

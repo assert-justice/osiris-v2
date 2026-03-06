@@ -40,4 +40,10 @@ public static class RojaUtils
         if(!TryAsString(jsonNode, out string str)) return false;
         return Enum.TryParse<T>(str, ignoreCase, out value);
     }
+    public static bool IsNullOrUndefined(JsonNode? jsonNode)
+    {
+        if(jsonNode is null) return true;
+        var kind = jsonNode.GetValueKind();
+        return kind == System.Text.Json.JsonValueKind.Undefined || kind == System.Text.Json.JsonValueKind.Null;
+    }
 }
