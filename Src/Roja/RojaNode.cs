@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 
 namespace Osiris.Src.Roja;
 
-public class RojaNode : IRojaSerializerJson<RojaNode>
+public class RojaNode
 {
     public enum ValueKind
     {
@@ -18,6 +18,32 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
     }
     public ValueKind Kind{get; private set;} = ValueKind.Null;
     public JsonNode? Value{get; private set;}
+    public RojaNode? Parent;
+    public int Count{get {
+            if(TryAsJsonArray(out var array)) return array?.Count ?? 0;
+            else if(TryAsJsonObject(out var obj)) return obj?.Count ?? 0;
+            return 0;
+        }
+    }
+    public bool LockWriteCount = false;
+    private ulong WriteCount_ = 0;
+    public ulong WriteCount
+    {
+        get => WriteCount_; 
+        // private set
+        // {
+        //     if (!LockWriteCount)
+        //     {
+        //         WriteCount_ = value;
+        //     }
+        // }
+    }
+    public void IncWriteCount()
+    {
+        if(LockWriteCount) return;
+        WriteCount_++;
+        Parent?.IncWriteCount();
+    }
     public RojaNode(){}
     public RojaNode(JsonNode? jsonNode)
     {
@@ -30,7 +56,9 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
     }
     private static (JsonNode?, ValueKind) FromJsonInternal(JsonNode? jsonNode)
     {
-        if(RojaUtils.IsNullOrUndefined(jsonNode)) return (null, ValueKind.Null);
+        if(jsonNode is null 
+            || jsonNode.GetValueKind() == JsonValueKind.Null 
+            || jsonNode.GetValueKind() == JsonValueKind.Undefined) return (null, ValueKind.Null);
         JsonNode? value = jsonNode;
         ValueKind kind = jsonNode?.GetValueKind() switch
         {
@@ -46,9 +74,17 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
     public void SetData(JsonNode? jsonNode)
     {
         (Value, Kind) = FromJsonInternal(jsonNode);
+       IncWriteCount();
+    }
+    public void SetData(RojaNode? rojaNode)
+    {
+       IncWriteCount();
+        if(rojaNode is null){Value = null; Kind = ValueKind.Null;}
+        else{Value = rojaNode.Value; Kind = rojaNode.Kind;}
     }
     public bool SetField(string? key, RojaNode? value)
     {
+       IncWriteCount();
         if(Value is null || key is null) return false;
         if(Kind == ValueKind.Array)
         {
@@ -65,6 +101,16 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
     public bool SetField(int key, RojaNode? value)
     {
         return SetField(key.ToString(), value);
+    }
+    public bool TryGetField(string key, out RojaNode rojaNode)
+    {
+        rojaNode = GetField(key)!;
+        return rojaNode is not null;
+    }
+    public bool TryGetField(int key, out RojaNode rojaNode)
+    {
+        rojaNode = GetField(key)!;
+        return rojaNode is not null;
     }
     public RojaNode? GetField(string key)
     {
@@ -83,9 +129,46 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
     {
         return GetField(key.ToString());
     }
+    public IEnumerable<KeyValuePair<string,RojaNode>> GetEntries()
+    {
+        if(TryAsJsonObject(out var obj))
+        {
+            foreach (var (key,value) in obj)
+            {
+                yield return new(key, new(value));
+            }
+        }
+        if(TryAsJsonArray(out var arr))
+        {
+            int key = 0;
+            foreach (var value in arr)
+            {
+                yield return new(key.ToString(), new(value));
+                key++;
+            }
+        }
+    }
+    public IEnumerable<RojaNode> GetValues()
+    {
+        if(TryAsJsonObject(out var obj))
+        {
+            foreach (var (_,value) in obj)
+            {
+                yield return new(value);
+            }
+        }
+        if(TryAsJsonArray(out var arr))
+        {
+            foreach (var value in arr)
+            {
+                yield return new(value);
+            }
+        }
+    }
     public bool SetPath(string path, RojaNode? rojaNode)
     {
         // Todo: make more efficient and robust
+        IncWriteCount();
         var p = path.Split('/');
         Stack<string> stackPath = new();
         foreach (var seg in p)
@@ -94,7 +177,7 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
         }
         return SetPath(stackPath, rojaNode);
     }
-    public bool SetPath(Stack<string> path, RojaNode? rojaNode)
+    private bool SetPath(Stack<string> path, RojaNode? rojaNode)
     {
         if(!path.TryPop(out string? seg))
         {
@@ -131,113 +214,190 @@ public class RojaNode : IRojaSerializerJson<RojaNode>
         if(field is null || field.Kind == ValueKind.Null) return null;
         return field.GetPath(path);
     }
-    public T? As<T>() where T : IRojaSerializerJson<T>
+    public bool TryAsString(out string value)
     {
-        return T.FromJson(Value);
+        return TryAsString(this, out value);
     }
-    public bool TryGetString(out string? value)
+    public static bool TryAsString(RojaNode? rojaNode, out string value)
     {
-        if(Value is not null && Value.AsValue().TryGetValue(out value)) return true;
-        value = default;
+        if(rojaNode?.Value is JsonNode jsonNode && jsonNode.AsValue().TryGetValue(out string? str))
+        {
+            value = str ?? string.Empty;
+            return true;
+        }
+        value = string.Empty;
         return false;
     }
-    public static RojaNode? FromString(string value)
+    public static RojaNode FromString(string value)
     {
         return new(JsonValue.Create(value), ValueKind.String);
     }
-    public bool TryGetBool(out bool value)
+    public static implicit operator RojaNode(string value) => FromString(value);
+    public static bool TryAsBool(RojaNode? rojaNode, out bool value)
     {
-        if(Value is not null && Value.AsValue().TryGetValue(out value)) return true;
+        if(rojaNode?.Value is JsonNode jsonNode && jsonNode.AsValue().TryGetValue(out value)) return true;
         value = default;
         return false;
     }
-    public static RojaNode? FromBool(bool value)
+    public bool TryAsBool(out bool value)
+    {
+        return TryAsBool(this, out value);
+    }
+    public static RojaNode FromBool(bool value)
     {
         return new(JsonValue.Create(value), ValueKind.Bool);
     }
-    public bool TryGeDouble(out double value)
+    public static implicit operator RojaNode(bool value) => FromBool(value);
+    public static bool TryAsDouble(RojaNode? rojaNode, out double value)
     {
-        if(Value is not null && Value.AsValue().TryGetValue(out value)) return true;
+        if(rojaNode?.Value is JsonNode jsonNode && jsonNode.AsValue().TryGetValue(out value)) return true;
         value = default;
         return false;
     }
-    public static RojaNode? FromDouble(double value)
+    public bool TryAsDouble(out double value)
+    {
+        return TryAsDouble(this, out value);
+    }
+    public static RojaNode FromDouble(double value)
     {
         return new(JsonValue.Create(value), ValueKind.Number);
     }
-    public bool TryGeFloat(out float value)
+    public static implicit operator RojaNode(double value) => FromDouble(value);
+    public static bool TryAsFloat(RojaNode? rojaNode, out float value)
     {
-        if(Value is not null && Value.AsValue().TryGetValue(out value)) return true;
+        if(rojaNode?.Value is JsonNode jsonNode && jsonNode.AsValue().TryGetValue(out value)) return true;
         value = default;
         return false;
     }
-    public static RojaNode? FromFloat(float value)
+    public bool TryAsFloat(out float value)
+    {
+        return TryAsFloat(this, out value);
+    }
+    public static RojaNode FromFloat(float value)
     {
         return new(JsonValue.Create(value), ValueKind.Number);
     }
-    public bool TryGeInt(out int value)
+    public static implicit operator RojaNode(float value) => FromFloat(value);
+    public static bool TryAsInt(RojaNode? rojaNode, out int value)
     {
-        if(TryGeFloat(out float val))
+        if(rojaNode?.Value is JsonNode jsonNode && jsonNode.AsValue().TryGetValue(out float f))
         {
-            value = (int)val;
+            value = (int)f;
             return true;
         }
         value = default;
         return false;
     }
-    public static RojaNode? FromInt(int value)
+    public bool TryAsInt(out int value)
+    {
+        return TryAsInt(this, out value);
+    }
+    public static RojaNode FromInt(int value)
     {
         // Todo: make sure this actually works
         return new(JsonValue.Create(value), ValueKind.Number);
     }
-    public bool TryGetEnum<T>(out T value) where T : struct
+    public static implicit operator RojaNode(int value) => FromInt(value);
+    public static bool TryAsEnum<T>(RojaNode? rojaNode, out T value) where T : struct
     {
         value = default;
-        if(!TryGetString(out string? str)) return false;
+        if(!TryAsString(rojaNode, out string str)) return false;
         return Enum.TryParse(str, true, out value);
+    }
+    public bool TryAsEnum<T>(out T value) where T : struct
+    {
+        return TryAsEnum(this, out value);
     }
     public static RojaNode? FromEnum<T>(T value) where T : struct
     {
         // Todo: handle name formatting better
         return new(JsonValue.Create(value.ToString()), ValueKind.Number);
     }
-    public bool TryGetJsonObject(out JsonObject? value)
+    public static bool TryAsJsonObject(RojaNode? rojaNode, out JsonObject value)
     {
-        if(Kind == ValueKind.Dict)
-        {
-            value = Value?.AsObject();
-            return true;
-        }
-        value = default;
-        return false;
+        value = []; 
+        if(rojaNode is null) return false;
+        if(rojaNode.Kind != ValueKind.Dict) return false;
+        var val = rojaNode?.Value?.AsObject();
+        if(val is null) return false;
+        value = val;
+        return true;
     }
-    public static RojaNode? FromJsonObject(JsonObject? value)
+    public bool TryAsJsonObject(out JsonObject value)
     {
-        if(value is null) return null;
-        return new(value, ValueKind.Dict);
+        return TryAsJsonObject(this, out value);
     }
-    public bool TryGetJsonArray(out JsonArray? value)
+    public static bool TryAsJsonArray(RojaNode? rojaNode, out JsonArray value)
     {
-        if(Kind == ValueKind.Array)
-        {
-            value = Value?.AsArray();
-            return true;
-        }
-        value = default;
-        return false;
+        value = []; 
+        if(rojaNode is null) return false;
+        if(rojaNode.Kind != ValueKind.Dict) return false;
+        var val = rojaNode?.Value?.AsArray();
+        if(val is null) return false;
+        value = val;
+        return true;
     }
-    public static RojaNode? FromJsonArray(JsonArray? value)
+    public bool TryAsJsonArray(out JsonArray value)
     {
-        if(value is null) return null;
-        return new(value, ValueKind.Array);
+        return TryAsJsonArray(this, out value);
     }
     public JsonNode? ToJson()
     {
         return Value;
     }
-    public static RojaNode? FromJson(JsonNode? jsonNode)
+
+    public static RojaNode FromJson(JsonNode? jsonNode)
+    {
+        return new(jsonNode);
+    }
+
+    public static RojaNode NewDict()
+    {
+        return new(new JsonObject());
+    }
+    public static RojaNode NewDict(IEnumerable<KeyValuePair<string, RojaNode>> entries)
+    {
+        RojaNode res = new(new JsonObject())
+        {
+            LockWriteCount = true
+        };
+        foreach (var (key, value) in entries)
+        {
+            res.SetField(key, value);
+        }
+        res.LockWriteCount = false;
+        // Todo: write count should be 0 at initialization right?
+        res.WriteCount_ = 0;
+        return res;
+    }
+    public static RojaNode NewArray()
+    {
+        return new(new JsonObject());
+    }
+    public static RojaNode NewArray(IEnumerable<RojaNode> values)
+    {
+        RojaNode res = new(new JsonObject())
+        {
+            LockWriteCount = true
+        };
+        int idx = 0;
+        foreach (var value in values)
+        {
+            res.SetField(idx, value);
+            idx++;
+        }
+        res.LockWriteCount = false;
+        return res;
+    }
+    public RojaNode DeepCopy()
+    {
+        return new(Value?.DeepClone());
+    }
+
+    public static bool TryFromJson(JsonNode? jsonNode, out RojaNode rojaNode)
     {
         var (value, kind) = FromJsonInternal(jsonNode);
-        return new(value, kind);
+        rojaNode = new(value, kind);
+        return true;
     }
 }

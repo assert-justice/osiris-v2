@@ -29,7 +29,7 @@ public abstract partial class DeNode
     {
         Parent = parent;
         Path = parent.Path + Path;
-        ParentTheme = new(parent.Theme);
+        ParentStyle.SetData(parent.BaseStyle.GetData());
         if(parent.Dom is not null) Dom =parent.Dom;
     }
     private void SetProps(JsonObject props){Props = props;}

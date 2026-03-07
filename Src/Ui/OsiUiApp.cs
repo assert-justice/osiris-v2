@@ -1,5 +1,4 @@
 using Godot;
-using Osiris.Src.Denature.Theme;
 
 namespace Osiris.Src.Ui;
 
@@ -9,9 +8,9 @@ public class OsiUiApp : OsiUiNode
     public OsiUiApp() : base("app", [])
     {
         AppControl = new();
-        if(!DeLength.TryFromString("100 %", out var width)) throw new System.Exception("oops");
-        if(!DeLength.TryFromString("100 %", out var height)) throw new System.Exception("oops");
-        ThemeOverrides.GetTheme().TrySetField<DeSize>("width", new(width, height));
+        // if(!DeLength.TryFromString("100 %", out var width)) throw new System.Exception("oops");
+        // if(!DeLength.TryFromString("100 %", out var height)) throw new System.Exception("oops");
+        // ThemeOverrides.GetTheme().TrySetField<DeSize>("width", new(width, height));
     }
 
     protected override Control GetControl()
